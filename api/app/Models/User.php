@@ -36,4 +36,19 @@ class User extends Authenticatable
     {
         return $this->hasMany(Punch::class);
     }
+
+    public function workSchedules(): HasMany
+    {
+        return $this->hasMany(WorkSchedule::class);
+    }
+
+    public function dailyWorkSummaries(): HasMany
+    {
+        return $this->hasMany(DailyWorkSummary::class);
+    }
+
+    public function bankTransactions(): HasMany
+    {
+        return $this->hasMany(BankTransaction::class);
+    }    
 }

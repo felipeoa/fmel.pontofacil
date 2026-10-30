@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Punch;
+use App\Models\User;
+use App\Services\WorkdayCalculationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use App\Models\Punch;
 
 class PunchController extends Controller
 {
@@ -97,6 +99,8 @@ class PunchController extends Controller
                 'after_data' => $this->snapshot($punch),
             ]);
 
+            $this->recalculateForPunch($user, $punch);
+
             return $punch;
         });
 
@@ -137,6 +141,22 @@ class PunchController extends Controller
 
             $before = $this->snapshot($punch);
 
+            $oldWorkDate = $this->workDateForPunch(
+                $request->user(),
+                $punch
+            );
+            
+            $newWorkDate = $this->workDateForPunch(
+                $request->user(),
+                $punch
+            );
+
+            $this->recalculateDate($request->user(), $oldWorkDate);
+
+            if ($newWorkDate !== $oldWorkDate) {
+                $this->recalculateDate($request->user(), $newWorkDate);
+            }            
+
             $reason = $data['reason'];
             unset($data['reason']);
 
@@ -153,12 +173,12 @@ class PunchController extends Controller
                 'action' => 'updated',
                 'reason' => $reason,
                 'before_data' => $before,
-                'after_data' => $this->snapshot($punch->fresh()),
+                'after_data' => $this->snapshot($punch),
             ]);
 
             return response()->json([
-                'message' => 'Marcação corrigida e auditada.',
-                'data' => $punch->fresh(),
+                'message' => 'Marcação corrigida, auditada e jornada recalculada.',
+                'data' => $punch,
             ]);
         });
     }
@@ -178,6 +198,11 @@ class PunchController extends Controller
 
             $before = $this->snapshot($punch);
 
+            $workDate = $this->workDateForPunch(
+                $request->user(),
+                $punch
+            );
+
             $punch->delete();
 
             $punch->audits()->create([
@@ -185,8 +210,10 @@ class PunchController extends Controller
                 'action' => 'deleted',
                 'reason' => $data['reason'],
                 'before_data' => $before,
-                'after_data' => $this->snapshot($punch->fresh()),
+                'after_data' => $this->snapshot($punch),
             ]);
+
+            $this->recalculateDate($request->user(), $workDate);            
 
             return response()->json([
                 'message' => 'Marcação excluída logicamente e auditada.',
@@ -216,6 +243,11 @@ class PunchController extends Controller
 
             $before = $this->snapshot($punch);
 
+            $workDate = $this->workDateForPunch(
+                $request->user(),
+                $punch
+            );            
+
             $punch->restore();
 
             $punch->audits()->create([
@@ -223,12 +255,14 @@ class PunchController extends Controller
                 'action' => 'restored',
                 'reason' => $data['reason'],
                 'before_data' => $before,
-                'after_data' => $this->snapshot($punch->fresh()),
+                'after_data' => $this->snapshot($punch),
             ]);
 
+            $this->recalculateDate($request->user(), $workDate);
+
             return response()->json([
-                'message' => 'Marcação restaurada e auditada.',
-                'data' => $punch->fresh(),
+                'message' => 'Marcação restaurada, auditada e jornada recalculada.',
+                'data' => $punch,
             ]);
         });
     }
@@ -264,4 +298,38 @@ class PunchController extends Controller
             'deleted_at' => $punch->deleted_at?->toISOString(),
         ];
     }
+
+    private function workDateForPunch(
+        User $user,
+        Punch $punch
+    ): string {
+        $schedule = $user->workSchedules()
+            ->where('active', true)
+            ->orderByDesc('is_default')
+            ->first();
+
+        $timezone = $schedule?->timezone
+            ?? config('app.timezone');
+
+        return Carbon::parse($punch->punched_at, 'UTC')
+            ->setTimezone($timezone)
+            ->toDateString();
+    }
+
+    private function recalculateDate(
+        User $user,
+        string $date
+    ): void {
+        app(WorkdayCalculationService::class)
+            ->calculate($user, $date);
+    }
+
+    private function recalculateForPunch(
+        User $user,
+        Punch $punch
+    ): void {
+        $date = $this->workDateForPunch($user, $punch);
+
+        $this->recalculateDate($user, $date);
+    }    
 }

@@ -17,8 +17,24 @@ class WorkdayCalculationService
     public function calculate(User $user, string $date): DailyWorkSummary
     {
         return DB::transaction(function () use ($user, $date) {
+
+            /*
+             * Serializa os cálculos do mesmo usuário.
+             * Evita concorrência na criação e atualização
+             * dos resumos diários.
+             */
+            $lockedUser = User::query()
+                ->whereKey($user->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $userId = $lockedUser->id;
+
+            /*
+             * Localiza a jornada válida para a data.
+             */
             $schedule = WorkSchedule::query()
-                ->where('user_id', $user->id)
+                ->where('user_id', $userId)
                 ->where('active', true)
                 ->whereDate('effective_from', '<=', $date)
                 ->where(function ($query) use ($date) {
@@ -54,8 +70,12 @@ class WorkdayCalculationService
                 $scheduleDay && $scheduleDay->is_working_day
             ) ? $scheduleDay->expected_minutes : 0;
 
+            /*
+             * Busca somente marcações ativas.
+             * Registros excluídos logicamente não entram no cálculo.
+             */
             $punches = Punch::query()
-                ->where('user_id', $user->id)
+                ->where('user_id', $userId)
                 ->whereBetween('punched_at', [$utcStart, $utcEnd])
                 ->orderBy('punched_at')
                 ->orderBy('id')
@@ -73,7 +93,11 @@ class WorkdayCalculationService
 
             $lastTimestamp = null;
 
+            /*
+             * Processamento da sequência de marcações.
+             */
             foreach ($punches as $punch) {
+
                 $time = CarbonImmutable::parse(
                     $punch->punched_at
                 )->setTimezone($timezone);
@@ -97,7 +121,9 @@ class WorkdayCalculationService
                 }
 
                 switch ($punch->type) {
+
                     case 'entry':
+
                         if ($started || $workStart || $breakStart) {
                             $invalid = true;
                             break 2;
@@ -108,6 +134,7 @@ class WorkdayCalculationService
                         break;
 
                     case 'break_start':
+
                         if (!$workStart || $breakStart) {
                             $invalid = true;
                             break 2;
@@ -121,6 +148,7 @@ class WorkdayCalculationService
                         break;
 
                     case 'break_end':
+
                         if (!$breakStart || $workStart) {
                             $invalid = true;
                             break 2;
@@ -134,6 +162,7 @@ class WorkdayCalculationService
                         break;
 
                     case 'exit':
+
                         if (!$workStart || $breakStart) {
                             $invalid = true;
                             break 2;
@@ -147,11 +176,15 @@ class WorkdayCalculationService
                         break;
 
                     default:
+
                         $invalid = true;
                         break 2;
                 }
             }
 
+            /*
+             * Identifica uma jornada completa.
+             */
             $complete = $started
                 && $finished
                 && !$workStart
@@ -162,10 +195,16 @@ class WorkdayCalculationService
                 ? 'invalid'
                 : ($complete ? 'complete' : 'pending');
 
-            // Tempo parcial pode ser exibido, mas ainda não gera saldo.
+            /*
+             * Jornada em andamento:
+             * calcula o tempo parcial sem gerar saldo.
+             */
             if (!$invalid && $workStart) {
-                $workedSeconds += now($timezone)->getTimestamp()
+
+                $partialSeconds = now($timezone)->getTimestamp()
                     - $workStart->getTimestamp();
+
+                $workedSeconds += max(0, $partialSeconds);
             }
 
             $workedMinutes = !$invalid
@@ -174,26 +213,44 @@ class WorkdayCalculationService
 
             $breakMinutes = !$invalid
                 ? intdiv(max(0, $breakSeconds), 60)
-                : 0;            
+                : 0;
 
+            /*
+             * Recupera e bloqueia o resumo diário.
+             */
             $summary = DailyWorkSummary::query()
-                ->where('user_id', $user->id)
+                ->where('user_id', $userId)
                 ->whereDate('work_date', $date)
                 ->lockForUpdate()
                 ->first();
 
             if (!$summary) {
+
                 $summary = new DailyWorkSummary();
-                $summary->user_id = $user->id;
+
+                $summary->user_id = $userId;
                 $summary->work_date = $date;
+                $summary->revision = 0;
+                $summary->balance_minutes = 0;
             }
 
             $oldBalance = (int) $summary->balance_minutes;
 
+            /*
+             * Somente jornadas completas geram saldo.
+             */
             $newBalance = $complete
                 ? $workedMinutes - $expectedMinutes
                 : 0;
 
+            /*
+             * Diferença entre o saldo anterior e o atual.
+             */
+            $difference = $newBalance - $oldBalance;
+
+            /*
+             * Atualiza o resumo diário.
+             */
             $summary->work_schedule_id = $schedule->id;
             $summary->expected_minutes = $expectedMinutes;
             $summary->worked_minutes = $workedMinutes;
@@ -202,26 +259,52 @@ class WorkdayCalculationService
             $summary->status = $status;
             $summary->calculated_at = now();
 
+            /*
+             * Incrementa a revisão somente quando
+             * existe alteração efetiva no saldo.
+             */
+            if ($difference !== 0) {
+
+                $summary->revision = (int) $summary->revision + 1;
+            }
+
             $summary->save();
 
-            // Registra somente a diferença em relação ao saldo anterior.
-            $difference = $newBalance - $oldBalance;
-
+            /*
+             * Registra a movimentação no banco de horas.
+             */
             if ($difference !== 0) {
+
+                $sourceKey = sprintf(
+                    'summary:%d:revision:%d',
+                    $summary->id,
+                    $summary->revision
+                );
+
                 BankTransaction::create([
-                    'user_id' => $user->id,
+
+                    'user_id' => $userId,
+
                     'daily_work_summary_id' => $summary->id,
+
                     'uuid' => (string) Str::uuid(),
+
+                    'source_key' => $sourceKey,
+
                     'transaction_type' => $difference > 0
                         ? 'credit'
                         : 'debit',
+
                     'minutes' => $difference,
+
                     'description' => 'Apuração da jornada de '
-                        . $date,
+                        . $date
+                        . ' - revisão '
+                        . $summary->revision,
                 ]);
             }
 
             return $summary;
-        });
+        }, 3);
     }
 }

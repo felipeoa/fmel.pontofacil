@@ -18,6 +18,7 @@ class DailyWorkSummary extends Model
         'balance_minutes',
         'status',
         'calculated_at',
+        'revision',
     ];
 
     protected function casts(): array
@@ -25,6 +26,7 @@ class DailyWorkSummary extends Model
         return [
             'work_date' => 'date',
             'calculated_at' => 'datetime',
+            'revision' => 'integer',
         ];
     }
 

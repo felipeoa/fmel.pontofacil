@@ -1,0 +1,15 @@
+[90m= [39m[34;4mApp\Models\DailyWorkSummary[39;24m {#8171
+    [34mid[39m: [35m1[39m,
+    [34muser_id[39m: [35m1[39m,
+    [34mwork_schedule_id[39m: [35m2[39m,
+    [34mwork_date[39m: [32m"[39m[32m2026-10-30[39m[32m"[39m,
+    [34mexpected_minutes[39m: [35m480[39m,
+    [34mworked_minutes[39m: [35m480[39m,
+    [34mbreak_minutes[39m: [35m60[39m,
+    [34mbalance_minutes[39m: [35m0[39m,
+    [34mstatus[39m: [32m"[39m[32mcomplete[39m[32m"[39m,
+    [34mcalculated_at[39m: [32m"[39m[32m2026-10-30 18:03:10[39m[32m"[39m,
+    [34mcreated_at[39m: [32m"[39m[32m2026-10-30 14:18:45[39m[32m"[39m,
+    [34mupdated_at[39m: [32m"[39m[32m2026-10-30 18:03:10[39m[32m"[39m,
+    [34mrevision[39m: [35m0[39m,
+  }

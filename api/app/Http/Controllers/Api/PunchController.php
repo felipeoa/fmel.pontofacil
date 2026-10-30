@@ -133,48 +133,52 @@ class PunchController extends Controller
         }
 
         return DB::transaction(function () use ($request, $data, $id) {
-            $punch = $request->user()
-                ->punches()
+
+            $user = $request->user();
+
+            $punch = $user->punches()
                 ->whereKey($id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            // Guarda os dados anteriores.
             $before = $this->snapshot($punch);
 
-            $oldWorkDate = $this->workDateForPunch(
-                $request->user(),
-                $punch
-            );
-            
-            $newWorkDate = $this->workDateForPunch(
-                $request->user(),
-                $punch
-            );
-
-            $this->recalculateDate($request->user(), $oldWorkDate);
-
-            if ($newWorkDate !== $oldWorkDate) {
-                $this->recalculateDate($request->user(), $newWorkDate);
-            }            
+            // Identifica a data original.
+            $oldWorkDate = $this->workDateForPunch($user, $punch);
 
             $reason = $data['reason'];
             unset($data['reason']);
 
+            // Converte o novo horário para UTC.
             if (isset($data['punched_at'])) {
                 $data['punched_at'] = Carbon::parse(
                     $data['punched_at']
                 )->utc();
             }
 
+            // Atualiza primeiro a marcação.
             $punch->update($data);
 
+            // Identifica a nova data após a alteração.
+            $newWorkDate = $this->workDateForPunch($user, $punch);
+
+            // Registra a auditoria.
             $punch->audits()->create([
-                'user_id' => $request->user()->id,
+                'user_id' => $user->id,
                 'action' => 'updated',
                 'reason' => $reason,
                 'before_data' => $before,
                 'after_data' => $this->snapshot($punch),
             ]);
+
+            // Recalcula a data original.
+            $this->recalculateDate($user, $oldWorkDate);
+
+            // Se mudou de dia, recalcula também a nova data.
+            if ($newWorkDate !== $oldWorkDate) {
+                $this->recalculateDate($user, $newWorkDate);
+            }
 
             return response()->json([
                 'message' => 'Marcação corrigida, auditada e jornada recalculada.',

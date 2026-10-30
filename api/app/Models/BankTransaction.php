@@ -11,6 +11,7 @@ class BankTransaction extends Model
         'user_id',
         'daily_work_summary_id',
         'uuid',
+        'source_key',
         'transaction_type',
         'minutes',
         'description',

@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use App\Models\Punch;
 
 class PunchController extends Controller
 {
- public function index(Request $request): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $punches = $request->user()
             ->punches()
@@ -82,12 +85,183 @@ class PunchController extends Controller
         $data['source'] = $data['source'] ?? 'manual';
         $data['synced_offline'] = $data['synced_offline'] ?? false;
 
-        $punch = $user->punches()->create($data);
+        $punch = DB::transaction(function () use ($user, $data) 
+        {
+            $punch = $user->punches()->create($data);
+
+            $punch->audits()->create([
+                'user_id' => $user->id,
+                'action' => 'created',
+                'reason' => 'Marcação registrada',
+                'before_data' => null,
+                'after_data' => $this->snapshot($punch),
+            ]);
+
+            return $punch;
+        });
 
         return response()->json(
         [
             'message' => 'Ponto registrado com sucesso.',
             'data' => $punch,
         ], 201);        
+    }
+
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:1000'],
+            'type' => [
+                'sometimes',
+                Rule::in(['entry', 'break_start', 'break_end', 'exit']),
+            ],
+            'punched_at' => ['sometimes', 'date'],
+            'notes' => ['sometimes', 'nullable', 'string', 'max:1000'],
+        ]);
+
+        if (!array_intersect(
+            array_keys($data),
+            ['type', 'punched_at', 'notes']
+        )) {
+            throw ValidationException::withMessages([
+                'data' => ['Informe pelo menos um campo para corrigir.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($request, $data, $id) {
+            $punch = $request->user()
+                ->punches()
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $before = $this->snapshot($punch);
+
+            $reason = $data['reason'];
+            unset($data['reason']);
+
+            if (isset($data['punched_at'])) {
+                $data['punched_at'] = Carbon::parse(
+                    $data['punched_at']
+                )->utc();
+            }
+
+            $punch->update($data);
+
+            $punch->audits()->create([
+                'user_id' => $request->user()->id,
+                'action' => 'updated',
+                'reason' => $reason,
+                'before_data' => $before,
+                'after_data' => $this->snapshot($punch->fresh()),
+            ]);
+
+            return response()->json([
+                'message' => 'Marcação corrigida e auditada.',
+                'data' => $punch->fresh(),
+            ]);
+        });
+    }
+
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        return DB::transaction(function () use ($request, $data, $id) {
+            $punch = $request->user()
+                ->punches()
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $before = $this->snapshot($punch);
+
+            $punch->delete();
+
+            $punch->audits()->create([
+                'user_id' => $request->user()->id,
+                'action' => 'deleted',
+                'reason' => $data['reason'],
+                'before_data' => $before,
+                'after_data' => $this->snapshot($punch->fresh()),
+            ]);
+
+            return response()->json([
+                'message' => 'Marcação excluída logicamente e auditada.',
+            ]);
+        });
+    }
+
+    public function restore(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        return DB::transaction(function () use ($request, $data, $id) {
+            $punch = $request->user()
+                ->punches()
+                ->withTrashed()
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (!$punch->trashed()) {
+                return response()->json([
+                    'message' => 'Esta marcação já está ativa.',
+                ], 409);
+            }
+
+            $before = $this->snapshot($punch);
+
+            $punch->restore();
+
+            $punch->audits()->create([
+                'user_id' => $request->user()->id,
+                'action' => 'restored',
+                'reason' => $data['reason'],
+                'before_data' => $before,
+                'after_data' => $this->snapshot($punch->fresh()),
+            ]);
+
+            return response()->json([
+                'message' => 'Marcação restaurada e auditada.',
+                'data' => $punch->fresh(),
+            ]);
+        });
+    }
+
+    public function audit(Request $request, int $id): JsonResponse
+    {
+        $punch = $request->user()
+            ->punches()
+            ->withTrashed()
+            ->whereKey($id)
+            ->firstOrFail();
+
+        return response()->json(
+            $punch->audits()
+                ->with('user:id,name')
+                ->orderByDesc('created_at')
+                ->paginate(50)
+        );
+    }
+
+    private function snapshot(Punch $punch): array
+    {
+        return [
+            'uuid' => $punch->uuid,
+            'type' => $punch->type,
+            'punched_at' => $punch->punched_at?->toISOString(),
+            'source' => $punch->source,
+            'synced_offline' => $punch->synced_offline,
+            'latitude' => $punch->latitude,
+            'longitude' => $punch->longitude,
+            'accuracy_meters' => $punch->accuracy_meters,
+            'notes' => $punch->notes,
+            'deleted_at' => $punch->deleted_at?->toISOString(),
+        ];
     }
 }

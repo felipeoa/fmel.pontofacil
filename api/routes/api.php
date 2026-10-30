@@ -16,6 +16,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::get('/punches', [PunchController::class, 'index']);
-    Route::post('/punches', [PunchController::class, 'store']);
+    Route::get('/punches',                  [PunchController::class, 'index']);
+    Route::post('/punches',                 [PunchController::class, 'store']);
+    Route::put('/punches/{id}',             [PunchController::class, 'update']);
+    Route::delete('/punches/{id}',          [PunchController::class, 'destroy']);
+    Route::post('/punches/{id}/restore',    [PunchController::class, 'restore']);
+    Route::get('/punches/{id}/audit',       [PunchController::class, 'audit']);
 });

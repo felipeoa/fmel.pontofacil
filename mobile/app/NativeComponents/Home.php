@@ -4,23 +4,27 @@ namespace App\NativeComponents;
 
 use Illuminate\View\View;
 use Native\Mobile\Edge\NativeComponent;
-use Native\Mobile\Facades\Browser;
 
 class Home extends NativeComponent
 {
-    public function openDocs(): void
+    public function registrarEntrada(): void
     {
-        Browser::inApp('https://nativephp.com/docs/mobile');
+        // Implementaremos o registro na próxima etapa.
     }
 
-    public function openDiscord(): void
+    public function iniciarIntervalo(): void
     {
-        Browser::open('https://discord.gg/nativephp');
+        // Implementaremos o registro na próxima etapa.
     }
 
-    public function openGitHub(): void
+    public function finalizarIntervalo(): void
     {
-        Browser::open('https://github.com/NativePHP');
+        // Implementaremos o registro na próxima etapa.
+    }
+
+    public function registrarSaida(): void
+    {
+        // Implementaremos o registro na próxima etapa.
     }
 
     public function render(): View

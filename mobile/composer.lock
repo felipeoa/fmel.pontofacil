@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0a0fe3b6fb7b05d6d60e8f2d8b3418dc",
+    "content-hash": "c6ee7259ece19a5760f5168b88b9c7f9",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -2369,16 +2369,16 @@
         },
         {
             "name": "nativephp/mobile",
-            "version": "4.6.1",
+            "version": "4.7.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/NativePHP/mobile-air.git",
-                "reference": "fd8ebf9d93ef59718267434bcb731bb381dc5e31"
+                "reference": "0d7e2e6509b1a0514726e67016fecade5e9137b2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/NativePHP/mobile-air/zipball/fd8ebf9d93ef59718267434bcb731bb381dc5e31",
-                "reference": "fd8ebf9d93ef59718267434bcb731bb381dc5e31",
+                "url": "https://api.github.com/repos/NativePHP/mobile-air/zipball/0d7e2e6509b1a0514726e67016fecade5e9137b2",
+                "reference": "0d7e2e6509b1a0514726e67016fecade5e9137b2",
                 "shasum": ""
             },
             "require": {
@@ -2403,17 +2403,17 @@
                 "nativephp/mobile-system": "*"
             },
             "require-dev": {
-                "larastan/larastan": "^2.0",
+                "larastan/larastan": "^3.0",
                 "laravel/pint": "^1.0",
-                "nunomaduro/collision": "^7.9",
-                "orchestra/testbench": "^8.18",
-                "pestphp/pest": "^2.7|^3.0|^4.0",
-                "pestphp/pest-plugin-arch": "^2.0",
-                "pestphp/pest-plugin-laravel": "^2.0",
+                "nunomaduro/collision": "^8.0",
+                "orchestra/testbench": "^10.0|^11.0",
+                "pestphp/pest": "^3.0",
+                "pestphp/pest-plugin-arch": "^3.0",
+                "pestphp/pest-plugin-laravel": "^3.0",
                 "phpstan/extension-installer": "^1.1",
-                "phpstan/phpstan-deprecation-rules": "^1.0",
-                "phpstan/phpstan-phpunit": "^1.0",
-                "spatie/laravel-ray": "^1.26"
+                "phpstan/phpstan-deprecation-rules": "^2.0",
+                "phpstan/phpstan-phpunit": "^2.0",
+                "spatie/laravel-ray": "^1.40"
             },
             "suggest": {
                 "ext-zip": "Required by native:install to validate and extract the downloaded Android PHP binary archives"
@@ -2460,9 +2460,9 @@
             ],
             "support": {
                 "issues": "https://github.com/NativePHP/mobile-air/issues",
-                "source": "https://github.com/NativePHP/mobile-air/tree/4.6.1"
+                "source": "https://github.com/NativePHP/mobile-air/tree/4.7.0"
             },
-            "time": "2026-10-25T15:51:00+00:00"
+            "time": "2026-10-29T17:31:02+00:00"
         },
         {
             "name": "nativephp/mobile-browser",
@@ -2521,20 +2521,20 @@
         },
         {
             "name": "nativephp/mobile-ui",
-            "version": "0.6.0",
+            "version": "0.9.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/NativePHP/mobile-ui.git",
-                "reference": "c2d78e0c544400d326118c0afbc0d8664b3367d9"
+                "reference": "9cee87cbc676a6500247bec99be5d19f633a04e9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/NativePHP/mobile-ui/zipball/c2d78e0c544400d326118c0afbc0d8664b3367d9",
-                "reference": "c2d78e0c544400d326118c0afbc0d8664b3367d9",
+                "url": "https://api.github.com/repos/NativePHP/mobile-ui/zipball/9cee87cbc676a6500247bec99be5d19f633a04e9",
+                "reference": "9cee87cbc676a6500247bec99be5d19f633a04e9",
                 "shasum": ""
             },
             "require": {
-                "nativephp/mobile": "^4.5",
+                "nativephp/mobile": "^4.7",
                 "php": "^8.3"
             },
             "require-dev": {
@@ -2571,7 +2571,7 @@
             "description": "Native SwiftUI and Jetpack Composer components for NativePHP",
             "support": {
                 "issues": "https://github.com/NativePHP/mobile-ui/issues",
-                "source": "https://github.com/NativePHP/mobile-ui/tree/0.6.0"
+                "source": "https://github.com/NativePHP/mobile-ui/tree/0.9.0"
             },
             "funding": [
                 {
@@ -2579,7 +2579,7 @@
                     "type": "other"
                 }
             ],
-            "time": "2026-09-19T15:06:44+00:00"
+            "time": "2026-10-29T17:44:09+00:00"
         },
         {
             "name": "nesbot/carbon",
@@ -10969,5 +10969,5 @@
         "php": "^8.3"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }
